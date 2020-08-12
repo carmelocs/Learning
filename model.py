@@ -110,7 +110,6 @@ class PointNetSeg(nn.Module):
         return x.transpose(2, 1).log_softmax(dim=-1)  # (64, 2048, num_class)
 
 
-
 def square_distance(src, dst):
     '''
     Input:
@@ -178,7 +177,8 @@ def index_points(points, idx):
     view_list[1:] = [1] * (len(view_list) - 1)
     repeat_list = list(idx.shape)
     repeat_list[0] = 1
-    batch_indices = torch.arange(B).to(device).view(view_list).repeat(repeat_list)
+    batch_indices = torch.arange(B).to(device).view(view_list).repeat(
+        repeat_list)
     new_points = points[batch_indices, idx, :]
 
     return new_points
@@ -247,7 +247,8 @@ def sample_and_group(npoint, radius, nsample, points):
     # [B, npoint, D]
     centered_features = index_points(features, centered_idx).to(device)
     # [B, npoint, C+D]
-    centered_points = torch.cat((centered_xyz, centered_features), dim=-1).to(device)
+    centered_points = torch.cat((centered_xyz, centered_features),
+                                dim=-1).to(device)
 
     # [B, npoint, nsample]
     grouped_idx = query_ball_point(nsample, radius, xyz, centered_xyz)
@@ -447,7 +448,7 @@ class FeaturePropagationLayer(nn.Module):
         interpolated_features = torch.sum(
             torch.mul(weight.view(B, N, 3, 1), layer2_features_knn),
             dim=-2) / torch.sum(weight, dim=-1).view(B, N, 1)
-        # if layer1 points only have position(xyz) data, i.e., D_1 = 0, 
+        # if layer1 points only have position(xyz) data, i.e., D_1 = 0,
         # we just use interpolated features as its new features,
         # otherwise, concatenate the layer1 features with interpolated
         # features as new features
@@ -462,27 +463,32 @@ class FeaturePropagationLayer(nn.Module):
         for i, conv1d in enumerate(self.conv1ds):
             bn = self.bns[i]
             new_features = F.relu(bn(conv1d(new_features)))
-        
+
         # [B, N, C + D_3]
         new_points = torch.cat((layer1_xyz, new_features.permute(0, 2, 1)),
                                dim=-1)
 
         return new_points
 
+
 class GAC_Net(nn.Module):
     def __init__(self, num_classes):
         super(GAC_Net, self).__init__()
         self.num_classes = num_classes
-        # GraphAttentionConvLayer(npoint, radius, nsample, mlp, feature_channel)
+        # GraphAttentionConvLayer(npoint, radius, nsample, mlp,
+        #                          feature_channel)
         # [B, 1024, 32+3]
         self.graph_pooling1 = GraphAttentionConvLayer(1024, 2, 32, [16, 32], 6)
         # [B, 256, 128+3]
-        self.graph_pooling2 = GraphAttentionConvLayer(256, 2, 32, [64, 128], 32)
+        self.graph_pooling2 = GraphAttentionConvLayer(256, 2, 32, [64, 128],
+                                                      32)
         # [B, 64, 256+3]
-        self.graph_pooling3 = GraphAttentionConvLayer(64, 2, 32, [256, 256], 128)
+        self.graph_pooling3 = GraphAttentionConvLayer(64, 2, 32, [256, 256],
+                                                      128)
         # [B, 16, 512+3]
-        self.graph_pooling4 = GraphAttentionConvLayer(16, 2, 32, [512, 512], 256)
-        
+        self.graph_pooling4 = GraphAttentionConvLayer(16, 2, 32, [512, 512],
+                                                      256)
+
         # FeaturePropagationLayer(in_channel, mlp)
         # in_channel = 256 + 512
         self.fp4 = FeaturePropagationLayer(256 + 512, [256, 256])
@@ -495,7 +501,7 @@ class GAC_Net(nn.Module):
 
         self.GAC_Layer = GraphAttentionConvLayer(4096, 2, 3, [32, 64], 32)
 
-        self.conv1d = nn.Conv1d(64+3, 32, 1)
+        self.conv1d = nn.Conv1d(64 + 3, 32, 1)
         self.bn = nn.BatchNorm1d(32)
 
         self.fc = nn.Linear(32, num_classes)
@@ -521,12 +527,14 @@ class GAC_Net(nn.Module):
         # [B, 4096, 64+3]
         layer0_points = self.GAC_Layer(layer0_points)
         # [B, 32, 4096]
-        layer0_points = F.relu(self.bn(self.conv1d(layer0_points.permute(0,2,1))))
+        layer0_points = F.relu(
+            self.bn(self.conv1d(layer0_points.permute(0, 2, 1))))
         # [B, 4096, num_classes]
-        layer0_points = self.fc(layer0_points.permute(0,2,1))
+        layer0_points = self.fc(layer0_points.permute(0, 2, 1))
         layer0_points = layer0_points.log_softmax(-1)
-        
+
         return layer0_points
+
 
 if __name__ == '__main__' and False:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))

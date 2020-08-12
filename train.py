@@ -45,8 +45,7 @@ FEATURE_TRANSFORM = opt.feature_transform
 
 if DATASET == 'S3DIS':
     all_files = get_data_files(
-            os.path.join(BASE_DIR,
-                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
+        os.path.join(BASE_DIR, 'indoor3d_sem_seg_hdf5_data/all_files.txt'))
     # print(self.all_files)
     random.shuffle(all_files)
     # print(self.all_files)
@@ -106,16 +105,17 @@ for epoch in range(NUM_EPOCH):
         pred_num = pred.argmax(dim=1)
         correct = (pred_num == label).sum().item()
         if DATASET == 'S3DIS':
-            accuracy = 100*correct/(BATCH_SIZE*NUM_POINTS)
+            accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
         else:
-            accuracy = 100*correct/BATCH_SIZE
+            accuracy = 100 * correct / BATCH_SIZE
         print(f'Epoch: {epoch}, iter: {i}, train loss: {loss.item():.3f}, \
 accuracy:{accuracy:.3f}%')
 
         if i % 10 == 9:
             j, (test_points, test_labels) = next(enumerate(test_dataloader))
             test_labels = test_labels.view(-1).long()
-            test_points, test_labels = test_points.to(device), test_labels.to(device)
+            test_points, test_labels = test_points.to(device), test_labels.to(
+                device)
             net = net.eval()
             pred = net(test_points)
             pred = pred.view(-1, NUM_CLASSES)
@@ -123,9 +123,9 @@ accuracy:{accuracy:.3f}%')
             pred_num = pred.argmax(dim=1)
             correct = (pred_num == test_labels).sum().item()
             if DATASET == 'S3DIS':
-                accuracy = 100*correct/(BATCH_SIZE*NUM_POINTS)
+                accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
             else:
-                accuracy = 100*correct/BATCH_SIZE
+                accuracy = 100 * correct / BATCH_SIZE
             print(
                 f'\nEpoch: {epoch}, iter: {i}, test loss: {loss.item():.3f}, \
 accuracy:{accuracy:.3f}%\n')
