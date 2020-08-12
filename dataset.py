@@ -138,16 +138,10 @@ class S3DISDataset(Dataset):
 
 
 class S3DISDatasetLite(Dataset):
-    def __init__(self, root, num_points=4096, train=True, split=18):
-        self.root = root
+    def __init__(self, all_files, num_points=4096, train=True, split=18):
         self.num_points = num_points
         self.train = train
-        self.all_files = get_data_files(
-            os.path.join(self.root,
-                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
-        # print(self.all_files)
-        random.shuffle(self.all_files)
-        # print(self.all_files)
+        self.all_files = all_files
 
         if self.train:
             self.all_files = self.all_files[:split]
@@ -190,8 +184,14 @@ if __name__ == '__main__':
     # print(f'Length of S3DIS train dataset:\n{len(train_dataset)}')
     # print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')
 
-    train_dataset = S3DISDatasetLite(root=BASE_DIR)
-    test_dataset = S3DISDatasetLite(root=BASE_DIR, train=False)
+    all_files = get_data_files(
+            os.path.join(BASE_DIR,
+                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
+    # print(self.all_files)
+    random.shuffle(all_files)
+    # print(self.all_files)
+    train_dataset = S3DISDatasetLite(all_files=all_files)
+    test_dataset = S3DISDatasetLite(all_files=all_files, train=False)
     print(f'Length of S3DIS train dataset:\n{len(train_dataset)}')
     print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')
 

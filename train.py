@@ -2,11 +2,12 @@ import torch
 import torch.optim as optim
 import torch.utils.data as data
 import torch.nn.functional as F
-from dataset import ModelNetDataset, S3DISDataset, S3DISDatasetLite
+from dataset import get_data_files, ModelNetDataset, S3DISDataset, S3DISDatasetLite
 from model import PointNetCls, PointNetSeg, GAC_Net
 import argparse
 import os
 import sys
+import random
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
@@ -43,8 +44,14 @@ NUM_EPOCH = opt.nepoch
 FEATURE_TRANSFORM = opt.feature_transform
 
 if DATASET == 'S3DIS':
-    dataset = S3DISDatasetLite(root=BASE_DIR)
-    test_dataset = S3DISDatasetLite(root=BASE_DIR, train=False)
+    all_files = get_data_files(
+            os.path.join(BASE_DIR,
+                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
+    # print(self.all_files)
+    random.shuffle(all_files)
+    # print(self.all_files)
+    dataset = S3DISDatasetLite(all_files=all_files)
+    test_dataset = S3DISDatasetLite(all_files=all_files, train=False)
 else:
     dataset = ModelNetDataset(root=BASE_DIR)
     test_dataset = ModelNetDataset(root=BASE_DIR, train=False)
