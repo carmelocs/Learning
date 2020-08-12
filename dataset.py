@@ -77,7 +77,12 @@ class ModelNetDataset(Dataset):
 
 
 class S3DISDataset(Dataset):
-    def __init__(self, root, num_points=4096, step=1, train=True, test_area='Area_5'):
+    def __init__(self,
+                 root,
+                 num_points=4096,
+                 step=1,
+                 train=True,
+                 test_area='Area_5'):
 
         self.root = root
         self.num_points = num_points
@@ -99,7 +104,8 @@ class S3DISDataset(Dataset):
             'table', 'chair', 'sofa', 'bookcase', 'board', 'clutter'
         ]
         self.num_classes = len(self.class_names)
-        self.data_batch, self.label_batch = load_data(self.all_files, step=self.step)
+        self.data_batch, self.label_batch = load_data(self.all_files,
+                                                      step=self.step)
 
         assert len(self.data_batch) == len(self.label_batch)
 
@@ -107,7 +113,7 @@ class S3DISDataset(Dataset):
         self.train_idxs = []
         self.test_idxs = []
         for j in range(0, len(self.all_files), self.step):
-            self.room_filelist.extend(room_filelist[j*1000: (j+1)*1000])
+            self.room_filelist.extend(room_filelist[j * 1000:(j + 1) * 1000])
         for i, room_name in enumerate(self.room_filelist):
             if self.test_area in room_name:
                 self.test_idxs.append(i)
@@ -136,7 +142,9 @@ class S3DISDatasetLite(Dataset):
         self.root = root
         self.num_points = num_points
         self.train = train
-        self.all_files = get_data_files(os.path.join(self.root, 'indoor3d_sem_seg_hdf5_data/all_files.txt'))
+        self.all_files = get_data_files(
+            os.path.join(self.root,
+                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
         # print(self.all_files)
         random.shuffle(self.all_files)
         # print(self.all_files)
@@ -152,7 +160,7 @@ class S3DISDatasetLite(Dataset):
         ]
         self.num_classes = len(self.class_names)
         self.data_batch, self.label_batch = load_data(self.all_files)
-                
+
         assert len(self.data_batch) == len(self.label_batch)
 
     def __getitem__(self, index):
@@ -185,7 +193,7 @@ if __name__ == '__main__':
     train_dataset = S3DISDatasetLite(root=BASE_DIR)
     test_dataset = S3DISDatasetLite(root=BASE_DIR, train=False)
     print(f'Length of S3DIS train dataset:\n{len(train_dataset)}')
-    print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')    
+    print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')
 
     dataloader = DataLoader(train_dataset, batch_size=64)
     for i, (point_cloud, label) in enumerate(dataloader):
