@@ -56,7 +56,7 @@ class PointNetCls(nn.Module):
     def forward(self, x):
         x = self.point_feature(x)  # (64, 1024, 1)
         x = F.relu(self.bn1(self.fc1(x.transpose(2,
-                                                 1)).squeeze()))  # (64, 512)
+                                                 1)).squeeze(1)))  # (64, 512)
         x = F.relu(self.bn2(self.dropout(self.fc2(x))))  # (64, 256)
         x = self.fc3(x)  # (64, num_class)
         return x.log_softmax(dim=-1)  # (64, num_class)
@@ -138,15 +138,16 @@ def farthest_point_sample(xyz, npoint):
     Return:
         centered_idx: [B, npoint]
     '''
+    device = xyz.device
     B, N, C = xyz.shape
     # [B, npoint]
-    centered_idx = torch.zeros(B, npoint, dtype=torch.long)
+    centered_idx = torch.zeros(B, npoint, dtype=torch.long).to(device)
     # [B]
-    farthest = torch.randint(0, N, (B, ), dtype=torch.long)
+    farthest = torch.randint(0, N, (B, ), dtype=torch.long).to(device)
     # [B, N]
-    distance = torch.ones(B, N) * 1e10
+    distance = torch.ones(B, N).to(device) * 1e10
     # [B]
-    batch_indices = torch.arange(0, B, dtype=torch.long)
+    batch_indices = torch.arange(0, B, dtype=torch.long).to(device)
     for i in range(npoint):
         centered_idx[:, i] = farthest
         centered_xyz = xyz[batch_indices, farthest, :].view(B, 1, C)
@@ -171,12 +172,13 @@ def index_points(points, idx):
     Return:
         new_points: [B, npoint, nsample, D]
     '''
+    device = points.device
     B, N, D = points.shape
     view_list = list(idx.shape)
     view_list[1:] = [1] * (len(view_list) - 1)
     repeat_list = list(idx.shape)
     repeat_list[0] = 1
-    batch_indices = torch.arange(B).view(view_list).repeat(repeat_list)
+    batch_indices = torch.arange(B).to(device).view(view_list).repeat(repeat_list)
     new_points = points[batch_indices, idx, :]
 
     return new_points
@@ -192,10 +194,11 @@ def query_ball_point(nsample, radius, xyz, centered_xyz):
     Return:
         grouped_idx: indices of neighbouring points [B, npoint, nsample]
     '''
+    device = xyz.device
     B, N, C = xyz.shape
     _, npoint, _ = centered_xyz.shape
     # [B, npoint, nsample]
-    grouped_idx = torch.zeros(B, npoint, nsample, dtype=torch.long)
+    grouped_idx = torch.zeros(B, npoint, nsample, dtype=torch.long).to(device)
     # [B, npiont, N]
     distance = square_distance(centered_xyz, xyz)
     # [B, npoint, N]
@@ -232,18 +235,19 @@ def sample_and_group(npoint, radius, nsample, points):
         centered_points: [B, npoint, C+D]
         grouped_points: [B, npoint, nsample, C+D]
     '''
+    device = points.device
     # [B, N, C]
     xyz = points[..., :3]
     # [B, N, D]
     features = points[..., 3:]
     # [B, npoint]
-    centered_idx = farthest_point_sample(xyz, npoint)
+    centered_idx = farthest_point_sample(xyz, npoint).to(device)
     # [B, npoint, C]
-    centered_xyz = index_points(xyz, centered_idx)
+    centered_xyz = index_points(xyz, centered_idx).to(device)
     # [B, npoint, D]
-    centered_features = index_points(features, centered_idx)
+    centered_features = index_points(features, centered_idx).to(device)
     # [B, npoint, C+D]
-    centered_points = torch.cat((centered_xyz, centered_features), dim=-1)
+    centered_points = torch.cat((centered_xyz, centered_features), dim=-1).to(device)
 
     # [B, npoint, nsample]
     grouped_idx = query_ball_point(nsample, radius, xyz, centered_xyz)
@@ -374,7 +378,7 @@ class GraphAttentionConvLayer(nn.Module):
             grouped_features = bn(conv2d(grouped_features))
 
         # [B, npoint, D']
-        centered_features = centered_features.permute(0, 3, 2, 1).squeeze()
+        centered_features = centered_features.permute(0, 3, 2, 1).squeeze(2)
         # [B, npoint, nsample, D']
         grouped_features = grouped_features.permute(0, 3, 2, 1)
         # [B, npoint, C+D']
