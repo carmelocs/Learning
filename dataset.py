@@ -27,7 +27,7 @@ def load_data(all_files, step=1):
     data_batch_list = []
     label_batch_list = []
     for h5_filename in all_files[::step]:
-        print(h5_filename)
+        # print(h5_filename)
         data_batch, label_batch = load_h5_file(h5_filename)
         data_batch_list.append(data_batch)
         label_batch_list.append(label_batch)

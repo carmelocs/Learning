@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 import torch.nn.functional as F
@@ -15,7 +16,7 @@ sys.path.append(BASE_DIR)
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize',
                     type=int,
-                    default=64,
+                    default=4,
                     help='input batch size')
 parser.add_argument('--workers',
                     type=int,
@@ -28,7 +29,7 @@ parser.add_argument('--nepoch',
 # parser.add_argument('--outf', type=str, default='cls', help='output folder')
 parser.add_argument('--dataset',
                     type=str,
-                    default='ModelNet40',
+                    default='S3DIS',
                     help="dataset name")
 parser.add_argument('--feature_transform',
                     action='store_true',
@@ -49,9 +50,11 @@ if DATASET == 'S3DIS':
     # print(self.all_files)
     random.shuffle(all_files)
     # print(self.all_files)
+    print('Loading data...')
     dataset = S3DISDatasetLite(all_files=all_files)
     test_dataset = S3DISDatasetLite(all_files=all_files, train=False)
 else:
+    print('Loading data...')
     dataset = ModelNetDataset(root=BASE_DIR)
     test_dataset = ModelNetDataset(root=BASE_DIR, train=False)
 
@@ -81,10 +84,19 @@ else:
     net = PointNetCls(num_class=NUM_CLASSES, num_point=NUM_POINTS)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-net.to(device)
-optim = optim.Adam(net.parameters(), lr=0.001)
 
-print(f'Using {torch.cuda.device_count()} GPUs.')
+if torch.cuda.device_count() > 1:
+    print(f'Using {torch.cuda.device_count()} GPUs.')
+    # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+    net = nn.DataParallel(net)
+elif torch.cuda.device_count() == 1:
+    print('Using one GPU.')
+else:
+    print('Using CPU.')
+
+net.to(device)
+
+optim = optim.Adam(net.parameters(), lr=0.001)
 
 num_batch = int(len(dataset) / BATCH_SIZE) \
     if len(dataset) % BATCH_SIZE == 0 \
@@ -108,7 +120,7 @@ for epoch in range(NUM_EPOCH):
             accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
         else:
             accuracy = 100 * correct / BATCH_SIZE
-        print(f'Epoch: {epoch}, iter: {i}, train loss: {loss.item():.3f}, \
+        print(f'Epoch: {epoch}/{NUM_EPOCH-1}, iter: {i}/{num_batch-1}, train loss: {loss.item():.3f}, \
 accuracy:{accuracy:.3f}%')
 
         if i % 10 == 9:
