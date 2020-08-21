@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 import torch.nn.functional as F
-from dataset import get_data_files, ModelNetDataset, S3DISDataset, S3DISDatasetLite
+from dataset import get_data_files, ModelNetDataset, S3DISDataset, \
+                    S3DISDatasetLite
 from model import PointNetCls, PointNetSeg, GAC_Net
 import argparse
 import os
@@ -17,23 +18,43 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize',
                     type=int,
                     default=4,
-                    help='input batch size')
+                    help='input batch size [default: 4]')
 parser.add_argument('--workers',
                     type=int,
                     default=0,
-                    help='number of data loading workers')
+                    help='number of data loading workers [default: 0]')
 parser.add_argument('--nepoch',
                     type=int,
                     default=120,
-                    help='number of epochs to train for')
+                    help='number of epochs to train for [default: 120]')
 # parser.add_argument('--outf', type=str, default='cls', help='output folder')
 parser.add_argument('--dataset',
                     type=str,
                     default='S3DIS',
-                    help="dataset name")
+                    help="dataset [default: S3DIS]")
 parser.add_argument('--feature_transform',
                     action='store_true',
                     help="use feature transform")
+parser.add_argument('--learning_rate',
+                    type=float,
+                    default=0.01,
+                    help='learning rate for training [default: 0.01]')
+parser.add_argument('--weight_decay',
+                    type=float,
+                    default=1e-4,
+                    help='weight decay for Adam')
+parser.add_argument('--optimizer',
+                    type=str,
+                    default='Adam',
+                    help='type of optimizer [default: Adam]')
+parser.add_argument('--dropout',
+                    type=float,
+                    default=0,
+                    help='dropout [defautl: 0]')
+parser.add_argument('--alpha',
+                    type=float,
+                    default=0.2,
+                    help='alpha for leakyRelu [default: 0.2]')
 
 opt = parser.parse_args()
 print(opt)
@@ -43,6 +64,11 @@ BATCH_SIZE = opt.batchSize
 WORKERS = opt.workers
 NUM_EPOCH = opt.nepoch
 FEATURE_TRANSFORM = opt.feature_transform
+LR = opt.learning_rate
+WEIGHT_DECAY = opt.weight_decay
+OPTIMIZER = opt.optimizer
+DROPOUT = opt.dropout
+ALPHA = opt.alpha
 
 if DATASET == 'S3DIS':
     all_files = get_data_files(
@@ -96,32 +122,48 @@ else:
 
 net.to(device)
 
-optim = optim.Adam(net.parameters(), lr=0.001)
+
+def adjust_learning_rate(optimizer, step):
+    """Sets the learning rate to the initial LR decayed
+    by 30 every 20000 steps
+    """
+    lr = LR * (0.3**(step // 20000))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
+optimizer = optim.Adam(net.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
 num_batch = int(len(dataset) / BATCH_SIZE) \
     if len(dataset) % BATCH_SIZE == 0 \
     else int(len(dataset) / BATCH_SIZE)+1
 print(f'Number of batches: {num_batch}')
 
+step = 0
+
 for epoch in range(NUM_EPOCH):
     for i, (point_cloud, label) in enumerate(dataloader):
         label = label.view(-1).long()
         point_cloud, label = point_cloud.to(device), label.to(device)
-        optim.zero_grad()
+        optimizer.zero_grad()
         net = net.train()
         pred = net(point_cloud)
         pred = pred.view(-1, NUM_CLASSES)
         loss = F.nll_loss(pred, label)
         loss.backward()
-        optim.step()
+        optimizer.step()
+        step += 1
+        adjust_learning_rate(optimizer, step)
+
         pred_num = pred.argmax(dim=1)
         correct = (pred_num == label).sum().item()
         if DATASET == 'S3DIS':
             accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
         else:
             accuracy = 100 * correct / BATCH_SIZE
-        print(f'Epoch: {epoch}/{NUM_EPOCH-1}, iter: {i}/{num_batch-1}, train loss: {loss.item():.3f}, \
-accuracy:{accuracy:.3f}%')
+        print(
+            f'Epoch: {epoch}/{NUM_EPOCH-1}, iter: {i}/{num_batch-1}, \
+train loss: {loss.item():.3f}, accuracy:{accuracy:.3f}%')
 
         if i % 10 == 9:
             j, (test_points, test_labels) = next(enumerate(test_dataloader))

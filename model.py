@@ -147,17 +147,22 @@ def farthest_point_sample(xyz, npoint):
     # initialize the first point of each batch
     farthest = torch.randint(0, N, (B, ), dtype=torch.long).to(device)
     # [B, N]
+    # distance matrix keeps the distance from all points to the current
+    # selected point set
     distance = torch.ones(B, N).to(device) * 1e10
     # [B]
     batch_indices = torch.arange(0, B, dtype=torch.long).to(device)
     for i in range(npoint):
         centered_idx[:, i] = farthest
         centered_xyz = xyz[batch_indices, farthest, :].view(B, 1, C)
+        # print(centered_xyz.shape)
         # print(centered_xyz.is_contiguous())
         # compute the distance from the current farthest points to all N points
+        # [B, N]
         dist = torch.sum((xyz - centered_xyz)**2, dim=-1)
-        # take the shortest distance as the distance from the remaining point
-        # set to the selected point set
+        # take the shortest distance between the remaining points and the
+        # selected points as the distance from the remaining points
+        # to the selected point set
         # (if the point has been selected, the distance=0(itself)
         # will not be updated)
         mask = dist < distance
@@ -173,10 +178,12 @@ def index_points(points, idx):
     '''
     Input:
         points: [B, N, D]
-        idx: [B, npoint, nsample]
+        idx: [B, n_1, n_2,..., n_m]
     Return:
-        new_points: [B, npoint, nsample, D]
+        new_points: [B, n_1, n_2,..., n_m, D]
+        can use gather()
     '''
+    # new_point = points.gather()
     device = points.device
     B, N, D = points.shape
     view_list = list(idx.shape)
@@ -296,11 +303,15 @@ def sample_and_group_all(points):
 
 
 class GraphAttention(nn.Module):
-    def __init__(self, all_channel, feature_channel):
+    def __init__(self, all_channel, feature_channel, dropout, alpha):
         super(GraphAttention, self).__init__()
         # initialize a matrix to compute attention scores of
         # each centered point and their neighbouring points
+        self.alpha = alpha
         self.a = nn.Parameter(torch.ones(all_channel, feature_channel))
+        nn.init.xavier_uniform_(self.a.data, gain=1.414)
+        self.dropout = dropout
+        self.leakyrelu = nn.LeakyReLU(self.alpha)
 
     def forward(self, centered_points, grouped_points):
         '''
@@ -320,10 +331,12 @@ class GraphAttention(nn.Module):
             B, npoint, 1, dim)
         # print(delta_p_concat_delta_h.is_contiguous())
         # [B, npoint, nsample, D]
-        attention = torch.matmul(delta_p_concat_delta_h, self.a)
+        attention = self.leakyrelu(torch.matmul(delta_p_concat_delta_h,
+                                                self.a))
         # [B, npoint, nsample, D]
         # normalize along each centered point's nsample neighbouring points
         attention = attention.softmax(dim=2)
+        attention = F.dropout(attention, self.dropout, training=self.training)
         # [B, npoint, nsample, D]
         # return weighted sum of each centered points by element-wise product
         # of the computed attention scores and its responding neighbouring
@@ -336,7 +349,14 @@ class GraphAttention(nn.Module):
 
 
 class GraphAttentionConvLayer(nn.Module):
-    def __init__(self, npoint, radius, nsample, mlp, feature_channel):
+    def __init__(self,
+                 npoint,
+                 radius,
+                 nsample,
+                 mlp,
+                 feature_channel,
+                 dropout=0.6,
+                 alpha=0.2):
         '''
         Input:
                 npoint: Number of point for centered points (by FPS sampling)
@@ -349,6 +369,8 @@ class GraphAttentionConvLayer(nn.Module):
         self.npoint = npoint
         self.radius = radius
         self.nsample = nsample
+        self.dropout = dropout
+        self.alpha = alpha
         self.conv2ds = nn.ModuleList()
         self.bns = nn.ModuleList()
         last_channel = feature_channel
@@ -357,7 +379,8 @@ class GraphAttentionConvLayer(nn.Module):
             self.bns.append(nn.BatchNorm2d(out_channel))
             last_channel = out_channel
 
-        self.GAC = GraphAttention(3 + last_channel, last_channel)
+        self.GAC = GraphAttention(3 + last_channel, last_channel, self.dropout,
+                                  self.alpha)
 
     def forward(self, points):
         '''
@@ -491,22 +514,29 @@ class FeaturePropagationLayer(nn.Module):
 
 
 class GAC_Net(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, dropout=0, alpha=0.2):
         super(GAC_Net, self).__init__()
         self.num_classes = num_classes
+        self.dropout = dropout
+        self.alpha = alpha
         # GraphAttentionConvLayer(npoint, radius, nsample, mlp,
-        #                          feature_channel)
+        #                          feature_channel, dropout, alpha)
         # [B, 1024, 64+3]
-        self.graph_pooling1 = GraphAttentionConvLayer(1024, 0.1, 32, [32, 64], 6)
+        self.graph_pooling1 = GraphAttentionConvLayer(1024, 0.1, 32, [32, 64],
+                                                      6, self.dropout,
+                                                      self.alpha)
         # [B, 256, 128+3]
         self.graph_pooling2 = GraphAttentionConvLayer(256, 0.2, 32, [64, 128],
-                                                      64)
+                                                      64, self.dropout,
+                                                      self.alpha)
         # [B, 64, 256+3]
         self.graph_pooling3 = GraphAttentionConvLayer(64, 0.4, 32, [128, 256],
-                                                      128)
+                                                      128, self.dropout,
+                                                      self.alpha)
         # [B, 16, 512+3]
         self.graph_pooling4 = GraphAttentionConvLayer(16, 0.8, 32, [256, 512],
-                                                      256)
+                                                      256, self.dropout,
+                                                      self.alpha)
 
         # FeaturePropagationLayer(in_channel, mlp)
         # in_channel = 256 + 512
@@ -559,7 +589,6 @@ class GAC_Net(nn.Module):
         return layer0_points
 
 
-
 if __name__ == '__main__':
     # BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     # BATCH_SIZE = 64
@@ -596,6 +625,9 @@ if __name__ == '__main__':
     # print(seg.shape)
 
     points = torch.randn(4, 4096, 9)
-    net = GAC_Net(num_classes=13)
-    output = net(points)
-    print(output.shape)
+    idx = farthest_point_sample(points[..., :3], 1024)
+    # idx_points = points.gather(dim=-1, index=idx)
+    print(idx.shape)
+    # net = GAC_Net(num_classes=13)
+    # output = net(points)
+    # print(output.shape)
