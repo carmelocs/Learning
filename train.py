@@ -3,9 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 import torch.nn.functional as F
-from dataset import get_data_files, ModelNetDataset, S3DISDataset, \
-                    S3DISDatasetLite
-from model import PointNetCls, PointNetSeg, GAC_Net
+from dataset import get_data_files, ModelNetDataset, S3DISDatasetLite
+from model import PointNetCls, GAC_Net
 import argparse
 import os
 import sys
@@ -161,8 +160,7 @@ for epoch in range(NUM_EPOCH):
             accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
         else:
             accuracy = 100 * correct / BATCH_SIZE
-        print(
-            f'Epoch: {epoch}/{NUM_EPOCH-1}, iter: {i}/{num_batch-1}, \
+        print(f'Epoch: {epoch}/{NUM_EPOCH-1}, iter: {i}/{num_batch-1}, \
 train loss: {loss.item():.3f}, accuracy:{accuracy:.3f}%')
 
         if i % 10 == 9:
