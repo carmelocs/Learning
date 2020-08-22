@@ -1,12 +1,12 @@
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-import os
-import sys
+# import os
+# import sys
 import h5py
-import random
+# import random
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(BASE_DIR)
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# sys.path.append(BASE_DIR)
 
 
 def get_data_files(filenames):
@@ -40,6 +40,41 @@ def load_data(all_files, step=1):
     return data_batches, label_batches
 
 
+def load_all_data(test_area=5):
+
+    all_files = get_data_files('./indoor3d_sem_seg_hdf5_data/all_files.txt')
+    data_batches = []
+    label_batches = []
+
+    for h5_filename in all_files:
+        data_batch, label_batch = load_h5_file(h5_filename)
+        data_batches.append(data_batch)
+        label_batches.append(label_batch)
+
+    data = np.concatenate(data_batches)
+    label = np.concatenate(label_batches)
+
+    room_filelist = get_data_files(
+        './indoor3d_sem_seg_hdf5_data/room_filelist.txt')
+    test_area = 'Area_' + str(test_area)
+    print(f'Test Area: {test_area}')
+    train_idxs = []
+    test_idxs = []
+
+    for i, room_name in enumerate(room_filelist):
+        if test_area in room_name:
+            test_idxs.append(i)
+        else:
+            train_idxs.append(i)
+
+    train_data = data[train_idxs]
+    train_label = label[train_idxs]
+    test_data = data[test_idxs]
+    test_label = label[test_idxs]
+
+    return train_data, train_label, test_data, test_label
+
+
 class ModelNetDataset(Dataset):
     def __init__(self, root, num_points=2048, train=True):
 
@@ -49,16 +84,13 @@ class ModelNetDataset(Dataset):
 
         if self.train:
             self.all_files = get_data_files(
-                os.path.join(self.root,
-                             'data/modelnet40_ply_hdf5_2048/train_files.txt'))
+                             './data/modelnet40_ply_hdf5_2048/train_files.txt')
         else:
             self.all_files = get_data_files(
-                os.path.join(self.root,
-                             'data/modelnet40_ply_hdf5_2048/test_files.txt'))
+                             './data/modelnet40_ply_hdf5_2048/test_files.txt')
 
         self.class_names = get_data_files(
-            os.path.join(self.root,
-                         'data/modelnet40_ply_hdf5_2048/shape_names.txt'))
+                         './data/modelnet40_ply_hdf5_2048/shape_names.txt')
 
         self.num_classes = len(self.class_names)  # 40 classes
         # data:(9840, 2048, 3) label:(9840, 1) for training
@@ -76,65 +108,79 @@ class ModelNetDataset(Dataset):
         return len(self.label_batch)
 
 
+# class S3DISDataset(Dataset):
+#     def __init__(self,
+#                  root,
+#                  num_points=4096,
+#                  step=1,
+#                  train=True,
+#                  test_area='Area_5'):
+
+#         self.root = root
+#         self.num_points = num_points
+#         self.train = train
+#         self.test_area = test_area
+#         self.step = step
+
+#         # put all the file pathes into a list
+#         self.all_files = get_data_files(
+#             os.path.join(self.root,
+#                          'indoor3d_sem_seg_hdf5_data/all_files.txt'))
+#         # get a list of 23585 annotations(point clouds),
+#         # each annotation has 4096 points
+#         room_filelist = get_data_files(
+#             os.path.join(self.root,
+#                          'indoor3d_sem_seg_hdf5_data/room_filelist.txt'))
+#         self.class_names = [
+#             'ceiling', 'floor', 'wall', 'beam', 'column', 'window', 'door',
+#             'table', 'chair', 'sofa', 'bookcase', 'board', 'clutter'
+#         ]
+#         self.num_classes = len(self.class_names)
+#         self.data_batch, self.label_batch = load_data(self.all_files,
+#                                                       step=self.step)
+
+#         assert len(self.data_batch) == len(self.label_batch)
+
+#         self.room_filelist = []
+#         self.train_idxs = []
+#         self.test_idxs = []
+#         for j in range(0, len(self.all_files), self.step):
+#             self.room_filelist.extend(room_filelist[j * 1000:(j + 1) * 1000])
+#         for i, room_name in enumerate(self.room_filelist):
+#             if self.test_area in room_name:
+#                 self.test_idxs.append(i)
+#             else:
+#                 self.train_idxs.append(i)
+#         self.train_data = self.data_batch[self.train_idxs]
+#         self.train_label = self.label_batch[self.train_idxs]
+#         self.test_data = self.data_batch[self.test_idxs]
+#         self.test_label = self.label_batch[self.test_idxs]
+
+#     def __getitem__(self, index):
+#         if self.train:
+#             point_cloud = self.train_data[index]
+#             point_labels = self.train_label[index]
+#         else:
+#             point_cloud = self.test_data[index]
+#             point_labels = self.test_label[index]
+#         return point_cloud, point_labels
+
+#     def __len__(self):
+#         return (len(self.train_idxs) if self.train else len(self.test_idxs))
+
+
 class S3DISDataset(Dataset):
-    def __init__(self,
-                 root,
-                 num_points=4096,
-                 step=1,
-                 train=True,
-                 test_area='Area_5'):
+    def __init__(self, data, label):
+        self.data = data
+        self.label = label
 
-        self.root = root
-        self.num_points = num_points
-        self.train = train
-        self.test_area = test_area
-        self.step = step
-
-        # put all the file pathes into a list
-        self.all_files = get_data_files(
-            os.path.join(self.root,
-                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
-        # get a list of 23585 annotations(point clouds),
-        # each annotation has 4096 points
-        room_filelist = get_data_files(
-            os.path.join(self.root,
-                         'indoor3d_sem_seg_hdf5_data/room_filelist.txt'))
-        self.class_names = [
-            'ceiling', 'floor', 'wall', 'beam', 'column', 'window', 'door',
-            'table', 'chair', 'sofa', 'bookcase', 'board', 'clutter'
-        ]
-        self.num_classes = len(self.class_names)
-        self.data_batch, self.label_batch = load_data(self.all_files,
-                                                      step=self.step)
-
-        assert len(self.data_batch) == len(self.label_batch)
-
-        self.room_filelist = []
-        self.train_idxs = []
-        self.test_idxs = []
-        for j in range(0, len(self.all_files), self.step):
-            self.room_filelist.extend(room_filelist[j * 1000:(j + 1) * 1000])
-        for i, room_name in enumerate(self.room_filelist):
-            if self.test_area in room_name:
-                self.test_idxs.append(i)
-            else:
-                self.train_idxs.append(i)
-        self.train_data = self.data_batch[self.train_idxs]
-        self.train_label = self.label_batch[self.train_idxs]
-        self.test_data = self.data_batch[self.test_idxs]
-        self.test_label = self.label_batch[self.test_idxs]
+        assert len(self.data) == len(self.label)
 
     def __getitem__(self, index):
-        if self.train:
-            point_cloud = self.train_data[index]
-            point_labels = self.train_label[index]
-        else:
-            point_cloud = self.test_data[index]
-            point_labels = self.test_label[index]
-        return point_cloud, point_labels
+        return self.data[index], self.label[index]
 
     def __len__(self):
-        return (len(self.train_idxs) if self.train else len(self.test_idxs))
+        return len(self.label)
 
 
 class S3DISDatasetLite(Dataset):
@@ -184,14 +230,16 @@ if __name__ == '__main__':
     # print(f'Length of S3DIS train dataset:\n{len(train_dataset)}')
     # print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')
 
-    all_files = get_data_files(
-            os.path.join(BASE_DIR,
-                         'indoor3d_sem_seg_hdf5_data/all_files.txt'))
+    # all_files = get_data_files('./indoor3d_sem_seg_hdf5_data/all_files.txt')
     # print(self.all_files)
-    random.shuffle(all_files)
+    # random.shuffle(all_files)
     # print(self.all_files)
-    train_dataset = S3DISDatasetLite(all_files=all_files)
-    test_dataset = S3DISDatasetLite(all_files=all_files, train=False)
+    # train_dataset = S3DISDatasetLite(all_files=all_files)
+    # test_dataset = S3DISDatasetLite(all_files=all_files, train=False)
+    train_data, train_label, test_data, test_label = load_all_data()
+    train_dataset = S3DISDataset(train_data, train_label)
+    test_dataset = S3DISDataset(test_data, test_label)
+
     print(f'Length of S3DIS train dataset:\n{len(train_dataset)}')
     print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')
 
