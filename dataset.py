@@ -173,7 +173,12 @@ class S3DISDataset(Dataset):
     def __init__(self, data, label):
         self.data = data
         self.label = label
-
+        self.class_names = [
+            'ceiling', 'floor', 'wall', 'beam', 'column', 'window', 'door',
+            'table', 'chair', 'sofa', 'bookcase', 'board', 'clutter'
+        ]
+        self.num_classes = len(self.class_names)
+        self.num_points = self.data.shape[1]
         assert len(self.data) == len(self.label)
 
     def __getitem__(self, index):
@@ -242,6 +247,8 @@ if __name__ == '__main__':
 
     print(f'Length of S3DIS train dataset:\n{len(train_dataset)}')
     print(f'Length of S3DIS test dataset:\n{len(test_dataset)}')
+    print(f'Number of classes: {train_dataset.num_classes}')
+    print(f'Number of points: {train_dataset.num_points}')
 
     dataloader = DataLoader(train_dataset, batch_size=64)
     for i, (point_cloud, label) in enumerate(dataloader):
