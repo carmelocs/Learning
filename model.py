@@ -523,21 +523,21 @@ class GAC_Net(nn.Module):
         # GraphAttentionConvLayer(npoint, radius, nsample, mlp,
         #                          feature_channel, dropout, alpha)
         # [B, 1024, 64+3]
-        self.graph_pooling1 = GraphAttentionConvLayer(1024, self.radius, 32, [32, 64],
-                                                      6, self.dropout,
-                                                      self.alpha)
+        self.graph_pooling1 = GraphAttentionConvLayer(1024, self.radius, 32,
+                                                      [32, 64], 6,
+                                                      self.dropout, self.alpha)
         # [B, 256, 128+3]
-        self.graph_pooling2 = GraphAttentionConvLayer(256, self.radius*2, 32, [64, 128],
-                                                      64, self.dropout,
-                                                      self.alpha)
+        self.graph_pooling2 = GraphAttentionConvLayer(256, self.radius * 2, 32,
+                                                      [64, 128], 64,
+                                                      self.dropout, self.alpha)
         # [B, 64, 256+3]
-        self.graph_pooling3 = GraphAttentionConvLayer(64, self.radius*4, 32, [128, 256],
-                                                      128, self.dropout,
-                                                      self.alpha)
+        self.graph_pooling3 = GraphAttentionConvLayer(64, self.radius * 4, 32,
+                                                      [128, 256], 128,
+                                                      self.dropout, self.alpha)
         # [B, 16, 512+3]
-        self.graph_pooling4 = GraphAttentionConvLayer(16, self.radius*8, 32, [256, 512],
-                                                      256, self.dropout,
-                                                      self.alpha)
+        self.graph_pooling4 = GraphAttentionConvLayer(16, self.radius * 8, 32,
+                                                      [256, 512], 256,
+                                                      self.dropout, self.alpha)
 
         # FeaturePropagationLayer(in_channel, mlp)
         # in_channel = 256 + 512
