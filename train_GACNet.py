@@ -8,9 +8,9 @@ from model import GAC_Net
 import argparse
 from pathlib import Path
 from tqdm import tqdm
+import time
 import datetime
 import logging
-from collections import defaultdict
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize',
@@ -132,10 +132,9 @@ num_batch = int(len(train_dataset) / BATCH_SIZE) \
     else int(len(train_dataset) / BATCH_SIZE)+1
 print(f'Number of batches: {num_batch}')
 
-history = defaultdict(lambda: list())
 best_acc = 0
 step = 0
-correct = 0
+TIME = 0
 
 k_radius = range(1, 5)
 k_score = []
@@ -153,7 +152,7 @@ for k in k_radius:
     else:
         print('Training from scratch')
         logger.info('Training from scratch')
-
+    logger.info(f'Radius: {k*0.1}')
     pretrain = opt.pretrain
     init_epoch = int(pretrain[-14:-11]) if opt.pretrain is not None else 0
 
@@ -172,8 +171,12 @@ for k in k_radius:
     optimizer = optim.Adam(net.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
     for epoch in range(init_epoch, NUM_EPOCH):
+        # torch.cuda.synchronize()
+        start = time.time()
+
         for i, (point_cloud, label) in tqdm(enumerate(train_dataloader),
                                             total=len(train_dataloader)):
+            train_correct = 0
             label = label.view(-1).long()
             point_cloud, label = point_cloud.to(device), label.to(device)
             optimizer.zero_grad()
@@ -186,15 +189,33 @@ for k in k_radius:
             step += 1
             adjust_learning_rate(optimizer, step)
             pred_num = pred.argmax(dim=-1)
-            correct += (pred_num == label).sum().item()
+            train_correct += (pred_num == label).sum().item()
 
-        accuracy = 100 * correct / (len(train_dataset) * NUM_POINTS)
-        correct = 0
-        print(f'Epoch: {epoch}/{NUM_EPOCH-1}, accuracy:{accuracy:.3f}%')
-        logger.info(f'Epoch: {epoch}/{NUM_EPOCH-1}, accuracy:{accuracy:.3f}%')
+        # torch.cuda.synchronize()
+        end = time.time()
+        TIME += end - start
+        train_acc = 100 * train_correct / (len(train_dataset) * NUM_POINTS)
+        print(
+            f'Epoch: {epoch}/{NUM_EPOCH-1}, training accuracy:{train_acc:.3f}%, \
+                Time: {end-start}s')
+        logger.info(
+            f'Epoch: {epoch}/{NUM_EPOCH-1}, training accuracy:{train_acc:.3f}%, \
+                Time: {end-start}s')
 
-        if accuracy > best_acc:
-            best_acc = accuracy
+        for i, (point_cloud, label) in tqdm(enumerate(test_dataloader),
+                                            total=len(test_dataloader)):
+            test_correct = 0
+            label = label.view(-1).long()
+            point_cloud, label = point_cloud.to(device), label.to(device)
+            net = net.eval()
+            pred = net(point_cloud)
+            pred = pred.view(-1, NUM_CLASSES)
+            pred_num = pred.argmax(dim=-1)
+            test_correct += (pred_num == label).sum().item()
+
+        test_acc = 100 * test_correct / (len(test_dataset) * NUM_POINTS)
+        if test_acc > best_acc:
+            best_acc = test_acc
             print('Saving model...')
             logger.info('Save model')
             torch.save(
@@ -202,6 +223,8 @@ for k in k_radius:
                 f'{checkpoints_dir}/GACNet_{epoch}_{best_acc:.4f}%.pth')
 
     k_score.append(best_acc)
+    print(f'Average time/epoch: {TIME/NUM_EPOCH}')
+    logger.info(f'Average time/epoch: {TIME/NUM_EPOCH}')
 
 print(f'Best radius: {k_score.index(max(k_score))*0.1}')
 logger.info(f'Best radius: {k_score.index(max(k_score))*0.1}')
