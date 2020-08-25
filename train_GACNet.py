@@ -6,15 +6,10 @@ import torch.nn.functional as F
 from dataset import load_all_data, S3DISDataset
 from model import GAC_Net
 import argparse
-import os
-import sys
 from pathlib import Path
 import datetime
 import logging
 from collections import defaultdict
-
-# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# sys.path.append(BASE_DIR)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize',
@@ -92,31 +87,35 @@ OPTIMIZER = opt.optimizer
 DROPOUT = opt.dropout
 ALPHA = opt.alpha
 
-
 print('Loading data...')
 train_data, train_label, test_data, test_label = load_all_data(test_area=5)
 train_dataset = S3DISDataset(data=train_data, label=train_label)
 test_dataset = S3DISDataset(data=test_data, label=test_label)
 
 train_dataloader = data.DataLoader(train_dataset,
-                             batch_size=BATCH_SIZE,
-                             shuffle=True,
-                             num_workers=WORKERS)
+                                   batch_size=BATCH_SIZE,
+                                   shuffle=True,
+                                   num_workers=WORKERS)
 
 NUM_CLASSES = train_dataset.num_classes
 NUM_POINTS = train_dataset.num_points
 
 test_dataloader = data.DataLoader(test_dataset,
-                                  batch_size=BATCH_SIZE*2,
+                                  batch_size=BATCH_SIZE * 2,
                                   shuffle=True,
                                   num_workers=WORKERS)
 
 print(f'Length of training dataset: {len(train_dataset)}')
+logger.info(f'Length of training dataset: {len(train_dataset)}')
 print(f'Length of testing dataset: {len(test_dataset)}')
+logger.info(f'Length of testing dataset: {len(test_dataset)}')
 print(f'Number of classes: {NUM_CLASSES}')
+logger.info(f'Number of classes: {NUM_CLASSES}')
+
 
 def blue(x):
     return '\033[94m' + x + '\033[0m'
+
 
 def adjust_learning_rate(optimizer, step):
     """Sets the learning rate to the initial LR decayed
@@ -135,17 +134,21 @@ print(f'Number of batches: {num_batch}')
 history = defaultdict(lambda: list())
 best_acc = 0
 step = 0
+correct = 0
 
 k_radius = range(1, 5)
 k_score = []
 
 for k in k_radius:
-    net = GAC_Net(num_classes=NUM_CLASSES, radius=0.1*k, dropout=DROPOUT, alpha=ALPHA)
+    net = GAC_Net(num_classes=NUM_CLASSES,
+                  radius=0.1 * k,
+                  dropout=DROPOUT,
+                  alpha=ALPHA)
 
     if opt.pretrain is not None:
         net.load_state_dict(torch.load(opt.pretrain))
-        print('load model %s' % opt.pretrain)
-        logger.info('load model %s' % opt.pretrain)
+        print(f'load model {opt.pretrain}')
+        logger.info(f'load model {opt.pretrain}')
     else:
         print('Training from scratch')
         logger.info('Training from scratch')
@@ -157,7 +160,6 @@ for k in k_radius:
 
     if torch.cuda.device_count() > 1:
         print(f'Using {torch.cuda.device_count()} GPUs.')
-        # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
         net = nn.DataParallel(net)
     elif torch.cuda.device_count() == 1:
         print('Using one GPU.')
@@ -181,26 +183,23 @@ for k in k_radius:
             optimizer.step()
             step += 1
             adjust_learning_rate(optimizer, step)
+            pred_num = pred.argmax(dim=-1)
+            correct += (pred_num == label).sum().item()
 
-            if epoch % 10 == 0:
-                pred_num = pred.argmax(dim=-1)
-                correct = (pred_num == label).sum().item()
-                accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
-                print(f'Epoch: {epoch}/{NUM_EPOCH-1}, iter: {i}/{num_batch-1}, \
-        train loss: {loss.item():.3f}, accuracy:{accuracy:.3f}%')
+        accuracy = 100 * correct / (len(train_dataset) * NUM_POINTS)
+        correct = 0
+        print(f'Epoch: {epoch}/{NUM_EPOCH-1}, accuracy:{accuracy:.3f}%')
+        logger.info(f'Epoch: {epoch}/{NUM_EPOCH-1}, accuracy:{accuracy:.3f}%')
 
-    #         if i % 10 == 9:
-    #             j, (test_points, test_labels) = next(enumerate(test_dataloader))
-    #             test_labels = test_labels.view(-1).long()
-    #             test_points, test_labels = test_points.to(device), test_labels.to(
-    #                 device)
-    #             net = net.eval()
-    #             pred = net(test_points)
-    #             pred = pred.view(-1, NUM_CLASSES)
-    #             loss = F.nll_loss(pred, test_labels)
-    #             pred_num = pred.argmax(dim=-1)
-    #             correct = (pred_num == test_labels).sum().item()
-    #             accuracy = 100 * correct / (BATCH_SIZE * NUM_POINTS)
-    #             print(
-    #                 f'\nEpoch: {epoch}, iter: {i}, test loss: {loss.item():.3f}, \
-    # accuracy:{accuracy:.3f}%\n')
+        if accuracy > best_acc:
+            best_acc = accuracy
+            print('Saving model...')
+            logger.info('Save model')
+            torch.save(
+                net.state_dict(),
+                f'{checkpoints_dir}/GACNet_{epoch}_{best_acc:.4f}%.pth')
+
+    k_score.append(best_acc)
+
+print(f'Best radius: {k_score.index(max(k_score))*0.1}')
+logger.info(f'Best radius: {k_score.index(max(k_score))*0.1}')

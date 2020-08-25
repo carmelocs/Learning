@@ -108,9 +108,9 @@ else:
     test_dataset = ModelNetDataset(root=BASE_DIR, train=False)
 
 train_dataloader = data.DataLoader(train_dataset,
-                             batch_size=BATCH_SIZE,
-                             shuffle=True,
-                             num_workers=WORKERS)
+                                   batch_size=BATCH_SIZE,
+                                   shuffle=True,
+                                   num_workers=WORKERS)
 
 NUM_CLASSES = train_dataset.num_classes
 NUM_POINTS = train_dataset.num_points
