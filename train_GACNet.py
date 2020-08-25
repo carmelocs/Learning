@@ -171,12 +171,11 @@ for k in k_radius:
     optimizer = optim.Adam(net.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
     for epoch in range(init_epoch, NUM_EPOCH):
-        # torch.cuda.synchronize()
+        torch.cuda.synchronize()
         start = time.time()
-
+        train_correct = 0
         for i, (point_cloud, label) in tqdm(enumerate(train_dataloader),
                                             total=len(train_dataloader)):
-            train_correct = 0
             label = label.view(-1).long()
             point_cloud, label = point_cloud.to(device), label.to(device)
             optimizer.zero_grad()
@@ -191,20 +190,20 @@ for k in k_radius:
             pred_num = pred.argmax(dim=-1)
             train_correct += (pred_num == label).sum().item()
 
-        # torch.cuda.synchronize()
+        torch.cuda.synchronize()
         end = time.time()
         TIME += end - start
         train_acc = 100 * train_correct / (len(train_dataset) * NUM_POINTS)
         print(
-            f'Epoch: {epoch}/{NUM_EPOCH-1}, training accuracy:{train_acc:.3f}%, \
+            f'Epoch: {epoch}/{NUM_EPOCH-1}, train accuracy: {train_acc:.3f}%, \
                 Time: {end-start}s')
         logger.info(
-            f'Epoch: {epoch}/{NUM_EPOCH-1}, training accuracy:{train_acc:.3f}%, \
+            f'Epoch: {epoch}/{NUM_EPOCH-1}, train accuracy: {train_acc:.3f}%, \
                 Time: {end-start}s')
 
+        test_correct = 0
         for i, (point_cloud, label) in tqdm(enumerate(test_dataloader),
                                             total=len(test_dataloader)):
-            test_correct = 0
             label = label.view(-1).long()
             point_cloud, label = point_cloud.to(device), label.to(device)
             net = net.eval()
@@ -214,6 +213,11 @@ for k in k_radius:
             test_correct += (pred_num == label).sum().item()
 
         test_acc = 100 * test_correct / (len(test_dataset) * NUM_POINTS)
+        blue_test = blue('test accuracy:')
+        print(f'Epoch: {epoch}/{NUM_EPOCH-1}, {blue_test} {test_acc:.3f}%')
+        logger.info(
+            f'Epoch: {epoch}/{NUM_EPOCH-1}, test accuracy: {test_acc:.3f}%')
+
         if test_acc > best_acc:
             best_acc = test_acc
             print('Saving model...')
@@ -223,8 +227,8 @@ for k in k_radius:
                 f'{checkpoints_dir}/GACNet_{epoch}_{best_acc:.4f}%.pth')
 
     k_score.append(best_acc)
-    print(f'Average time/epoch: {TIME/NUM_EPOCH}')
-    logger.info(f'Average time/epoch: {TIME/NUM_EPOCH}')
+    print(f'Average training time/epoch: {TIME/NUM_EPOCH}')
+    logger.info(f'Average training time/epoch: {TIME/NUM_EPOCH}')
 
 print(f'Best radius: {k_score.index(max(k_score))*0.1}')
 logger.info(f'Best radius: {k_score.index(max(k_score))*0.1}')
