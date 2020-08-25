@@ -7,6 +7,7 @@ from dataset import load_all_data, S3DISDataset
 from model import GAC_Net
 import argparse
 from pathlib import Path
+from tqdm import tqdm
 import datetime
 import logging
 from collections import defaultdict
@@ -171,7 +172,8 @@ for k in k_radius:
     optimizer = optim.Adam(net.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
     for epoch in range(init_epoch, NUM_EPOCH):
-        for i, (point_cloud, label) in enumerate(train_dataloader):
+        for i, (point_cloud, label) in tqdm(enumerate(train_dataloader),
+                                            total=len(train_dataloader)):
             label = label.view(-1).long()
             point_cloud, label = point_cloud.to(device), label.to(device)
             optimizer.zero_grad()
