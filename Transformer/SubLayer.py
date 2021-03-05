@@ -7,7 +7,7 @@ class ScaledDotProductAttention(nn.Module):
     """
     Compute Scaled Dot Product Attention
     """
-    def __init__(self, dropout):
+    def __init__(self, dropout=0.1):
         super(ScaledDotProductAttention, self).__init__()
         self.dropout = nn.Dropout(dropout)
 
@@ -31,19 +31,19 @@ class ScaledDotProductAttention(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, h, d_model, d_k, d_v, dropout=0.1):
+    def __init__(self, d_model, num_head, d_k, d_v, dropout=0.1):
         super(MultiHeadAttention, self).__init__()
 
-        assert d_model % h == 0
+        assert d_model % num_head == 0
 
-        self.h = h
+        self.num_head = num_head
         self.d_k = d_k
         self.d_v = d_v
 
-        self.wq = nn.Linear(d_model, h * d_k)
-        self.wk = nn.Linear(d_model, h * d_k)
-        self.wv = nn.Linear(d_model, h * d_v)
-        self.fc = nn.Linear(h * d_v, d_model)
+        self.wq = nn.Linear(d_model, num_head * d_k)
+        self.wk = nn.Linear(d_model, num_head * d_k)
+        self.wv = nn.Linear(d_model, num_head * d_v)
+        self.fc = nn.Linear(num_head * d_v, d_model)
 
         self.attention = ScaledDotProductAttention(dropout=dropout)
 
@@ -59,17 +59,17 @@ class MultiHeadAttention(nn.Module):
         # print(f"query: {query.shape}, \nkey: {key.shape}, \nvalue: {value.shape}")
 
         # linear projection and split d_model by heads
-        query = self.wq(query).view(batch_size, -1, self.h,
+        query = self.wq(query).view(batch_size, -1, self.num_head,
                                     self.d_k).transpose(
                                         1, 2)  # [batch, h, len_query, d_k]
-        key = self.wk(key).view(batch_size, -1, self.h, self.d_k).transpose(
+        key = self.wk(key).view(batch_size, -1, self.num_head, self.d_k).transpose(
             1, 2)  # [batch, h, len_key, d_k]
-        value = self.wv(value).view(batch_size, -1, self.h,
+        value = self.wv(value).view(batch_size, -1, self.num_head,
                                     self.d_v).transpose(
                                         1, 2)  # [batch, h, len_value, d_v]
 
         if mask is not None:
-            mask = mask.unsqueeze(1).repeat(1, self.h, 1, 1)
+            mask = mask.unsqueeze(1).repeat(1, self.num_head, 1, 1)
 
         att, scores = self.attention(
             query, key, value, mask
@@ -78,7 +78,7 @@ class MultiHeadAttention(nn.Module):
 
         # concat heads
         att_cat = att.transpose(1, 2).contiguous().view(
-            batch_size, -1, self.h * self.d_v)  # [batch, len_seq, d_model]
+            batch_size, -1, self.num_head * self.d_v)  # [batch, len_seq, d_model]
 
         # final linear projection
         output = self.fc(att_cat)  # [batch, len_seq, d_model]

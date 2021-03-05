@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
-from SubLayers import MultiHeadAttention, PositionWiseFeedForward
+from SubLayer import MultiHeadAttention, PositionWiseFeedForward
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self, d_model, d_ff, h, d_k, d_v, dropout=0.1):
+    def __init__(self, d_model, num_head, d_k, d_v, d_ff, dropout=0.1):
         super(EncoderLayer, self).__init__()
-        self.slf_att = MultiHeadAttention(h,
-                                          d_model,
+        self.slf_att = MultiHeadAttention(d_model,
+                                          num_head,
                                           d_k,
                                           d_v,
                                           dropout=dropout)
@@ -24,15 +24,15 @@ class EncoderLayer(nn.Module):
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, d_model, d_ff, h, d_k, d_v, dropout=0.1):
+    def __init__(self, d_model, num_head, d_k, d_v, d_ff, dropout=0.1):
         super(DecoderLayer, self).__init__()
-        self.slf_att = MultiHeadAttention(h,
-                                          d_model,
+        self.slf_att = MultiHeadAttention(d_model,
+                                          num_head,
                                           d_k,
                                           d_v,
                                           dropout=dropout)
-        self.enc_att = MultiHeadAttention(h,
-                                          d_model,
+        self.enc_att = MultiHeadAttention(d_model,
+                                          num_head,
                                           d_k,
                                           d_v,
                                           dropout=dropout)

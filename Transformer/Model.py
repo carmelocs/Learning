@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Layers import EncoderLayer, DecoderLayer
+from Layer import EncoderLayer, DecoderLayer
 
 
 def get_pad_mask(seq_q, seq_k):
@@ -24,9 +24,9 @@ class Encoder(nn.Module):
     def __init__(self,
                  len_src_vocab,
                  d_word_vec,
-                 num_layer,
                  d_model,
-                 h,
+                 num_head,
+                 num_layer,
                  d_k,
                  d_v,
                  d_ff,
@@ -37,7 +37,7 @@ class Encoder(nn.Module):
         self.src_word_emb = nn.Embedding(len_src_vocab, d_word_vec)
         self.dropout = nn.Dropout(p=dropout)
         self.layer_stack = nn.ModuleList([
-            EncoderLayer(d_model, d_ff, h, d_k, d_v, dropout)
+            EncoderLayer(d_model, num_head, d_k, d_v, d_ff, dropout)
             for _ in range(num_layer)
         ])
         self.layer_norm = nn.LayerNorm(d_model)
@@ -60,9 +60,9 @@ class Decoder(nn.Module):
     def __init__(self,
                  len_tgt_vocab,
                  d_word_vec,
-                 num_layer,
                  d_model,
-                 h,
+                 num_head,
+                 num_layer,
                  d_k,
                  d_v,
                  d_ff,
@@ -72,7 +72,7 @@ class Decoder(nn.Module):
         self.tgt_word_emb = nn.Embedding(len_tgt_vocab, d_word_vec)
         self.dropout = nn.Dropout(p=dropout)
         self.layer_stack = nn.ModuleList([
-            DecoderLayer(d_model, d_ff, h, d_k, d_v, dropout)
+            DecoderLayer(d_model, num_head, d_k, d_v, d_ff, dropout)
             for _ in range(num_layer)
         ])
         self.layer_norm = nn.LayerNorm(d_model)
@@ -97,11 +97,11 @@ class Transformer(nn.Module):
                  len_tgt_vocab,
                  d_word_vec,
                  d_model,
-                 d_ff,
+                 num_head,
                  num_layer,
-                 h,
                  d_k,
                  d_v,
+                 d_ff,
                  dropout=0.1):
 
         super(Transformer, self).__init__()
@@ -112,9 +112,9 @@ class Transformer(nn.Module):
 
         self.encoder = Encoder(len_src_vocab=len_src_vocab,
                                d_word_vec=d_word_vec,
-                               num_layer=num_layer,
                                d_model=d_model,
-                               h=h,
+                               num_head=num_head,
+                               num_layer=num_layer,
                                d_k=d_k,
                                d_v=d_v,
                                d_ff=d_ff,
@@ -122,9 +122,9 @@ class Transformer(nn.Module):
 
         self.decoder = Decoder(len_tgt_vocab=len_tgt_vocab,
                                d_word_vec=d_word_vec,
-                               num_layer=num_layer,
                                d_model=d_model,
-                               h=h,
+                               num_head=num_head,
+                               num_layer=num_layer,
                                d_k=d_k,
                                d_v=d_v,
                                d_ff=d_ff,
