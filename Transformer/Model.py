@@ -19,8 +19,8 @@ def get_pad_mask(seq_q, seq_k):
     pad_mask = seq_k.eq(0)
     # print(f"pad mask: {pad_mask.shape}")
 
-    pad_mask = pad_mask.unsqueeze(1).repeat(
-        1, len_q, 1)  # shape [B, len_q, len_k]
+    pad_mask = pad_mask.unsqueeze(1).repeat(1, len_q,
+                                            1)  # shape [B, len_q, len_k]
     # print(f"output of pad mask:{pad_mask.shape}")
 
     return pad_mask
@@ -75,7 +75,7 @@ class Encoder(nn.Module):
         for enc_layer in self.layer_stack:
             enc_output, *_ = enc_layer(enc_output, src_slf_mask)
         # print(
-            # f"enc_output: {enc_output.shape}\nenc_src_mask: {src_mask.shape}")
+        # f"enc_output: {enc_output.shape}\nenc_src_mask: {src_mask.shape}")
 
         return enc_output
 
@@ -102,7 +102,11 @@ class Decoder(nn.Module):
         self.layer_norm = nn.LayerNorm(d_model)
         self.d_model = d_model
 
-    def forward(self, tgt_word, enc_output, tgt_slf_mask=None, tgt_src_mask=None):
+    def forward(self,
+                tgt_word,
+                enc_output,
+                tgt_slf_mask=None,
+                tgt_src_mask=None):
         '''
         Input:
             tgt_word: [B, len_tgt]
@@ -181,7 +185,9 @@ class Transformer(nn.Module):
         tgt_slf_mask = get_pad_mask(tgt_word, tgt_word) & get_subsequent_mask(
             self.len_tgt_vocab, self.len_tgt_vocab)
         tgt_src_mask = get_pad_mask(tgt_word, src_word)
-        print(f"src_slf_mask: {src_slf_mask.shape}\ntgt_slf_mask: {tgt_slf_mask.shape}\ntgt_src_mask: {tgt_src_mask.shape}")
+        print(
+            f"src_slf_mask: {src_slf_mask.shape}\ntgt_slf_mask: {tgt_slf_mask.shape}\ntgt_src_mask: {tgt_src_mask.shape}"
+        )
 
         enc_output = self.encoder(src_word=src_word, src_slf_mask=src_slf_mask)
         # print(f"trans_src_word: {src_word.shape}\ntrans_src_mask: {src_mask.shape}\ntransf_enc_output: {enc_output.shape}\n")

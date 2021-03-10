@@ -17,7 +17,7 @@ class EncoderLayer(nn.Module):
         '''
         Encoder Layer: Encoder self-attention and 
                         Position-wise Feed-Forward layers
-        
+                        
         Input:
             enc_input: [B, len_src, d_model]
             slf_att_mask: [B, len_src, len_src]
@@ -68,23 +68,20 @@ class DecoderLayer(nn.Module):
         Output:
             dec_output: [B, len_tgt, d_model]
         '''
-        
-        dec_output, dec_slf_att = self.slf_att(dec_input,
-                                               dec_input,
-                                               dec_input,
+
+        dec_output, dec_slf_att = self.slf_att(dec_input, dec_input, dec_input,
                                                dec_slf_mask)
         # [B, len_tgt, d_model]
-        
-        dec_output, dec_enc_att = self.enc_att(dec_output,
-                                               enc_output,
-                                               enc_output,
-                                               dec_enc_mask)
+
+        dec_output, dec_enc_att = self.enc_att(dec_output, enc_output,
+                                               enc_output, dec_enc_mask)
         # [B, len_tgt, d_model]
 
         dec_output = self.pos_ffn(dec_output)
         # print(f"decoder output: {dec_output.shape}")
-        
+
         return dec_output, dec_slf_att, dec_enc_att
+
 
 if __name__ == '__main__':
     # Make some fake data
