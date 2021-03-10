@@ -154,3 +154,52 @@ class Transformer(nn.Module):
         print(f"seq_pred: {seq_pred.shape}")
 
         return F.log_softmax(seq_pred, dim=-1).max(-1)[0]
+
+
+if __name__ == '__main__':
+    # Make some fake data
+    torch.manual_seed(0)
+
+    BATCH_SIZE = 16
+    MAX_LEN_SEQ = 100
+    LEN_SRC = 100
+    LEN_TGT = 100
+    D_WORD_VEC = 512
+
+    src_word = torch.rand(BATCH_SIZE, LEN_SRC).long()
+    tgt_word = torch.rand(BATCH_SIZE, LEN_TGT).long()
+
+    # Hyperparameters
+
+    # number of encoder/decoder layers
+    NUM_LAYER = 6
+
+    # The dimensionality of input and output for EncoderDecoder model
+    D_MODEL = 512
+
+    # number of heads/parallel attention layers
+    NUM_HEAD = 8
+
+    # The dimensionality of qurey and key in each head
+    D_K = D_MODEL // NUM_HEAD
+    # print(d_k)
+
+    # The dimensionality of value in each head (could be different from d_k)
+    D_V = D_K
+
+    # The dimensionality of inner-layer for Position-wise Feed-Forward Network(FFN)
+    D_FF = 2048
+
+    transformer = Transformer(
+        len_src_vocab=LEN_SRC,
+        len_tgt_vocab=LEN_TGT,
+        d_word_vec=D_WORD_VEC,
+        d_model=D_MODEL,
+        num_head=NUM_HEAD,
+        num_layer=NUM_LAYER,
+        d_k=D_K,
+        d_v=D_V,
+        d_ff=D_FF,
+    )
+    pred = transformer(src_word, tgt_word)
+    print(f"pred: {pred.shape}")
