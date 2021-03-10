@@ -5,18 +5,35 @@ from Layer import EncoderLayer, DecoderLayer
 
 
 def get_pad_mask(seq_q, seq_k):
-    # seq_k和seq_q的形状都是[batch, len_seq]
+    '''
+    Input:
+        seq_q: [B, len_q]
+        seq_k: [B, len_k]
+    Output:
+        pad_mask: [B, len_q, len_k]
+    '''
+
     len_q = seq_q.size(1)
+
     # `PAD` is 0
     pad_mask = seq_k.eq(0)
-    # print(pad_mask.shape)
-    pad_mask = pad_mask.unsqueeze(1).expand(
-        -1, len_q, -1)  # shape [batch, len_seq, len_seq]
+    # print(f"pad mask: {pad_mask.shape}")
+
+    pad_mask = pad_mask.unsqueeze(1).repeat(
+        1, len_q, 1)  # shape [B, len_q, len_k]
+    # print(f"output of pad mask:{pad_mask.shape}")
+
     return pad_mask
 
 
 def get_subsequent_mask(len_q, len_k):
-    "Mask out subsequent positions."
+    '''
+    Mask out subsequent positions.
+    Input:
+        int: len_q, len_k
+    Output:
+        subsequent_mask: [1, len_q, len_k]
+    '''
     return torch.triu(torch.ones(1, len_q, len_k), diagonal=1) == 0
 
 
@@ -43,15 +60,18 @@ class Encoder(nn.Module):
         self.layer_norm = nn.LayerNorm(d_model)
         self.d_model = d_model
 
-    def forward(self, src_word, src_mask=None):
+    def forward(self, src_word, src_slf_mask=None):
+        '''
+        
+        '''
 
         enc_output = self.layer_norm(self.dropout(self.src_word_emb(src_word)))
         # print(f"enc_output: {enc_output.shape}")
 
         for enc_layer in self.layer_stack:
-            enc_output, *_ = enc_layer(enc_output, src_mask)
-        print(
-            f"enc_output: {enc_output.shape}\nenc_src_mask: {src_mask.shape}")
+            enc_output, *_ = enc_layer(enc_output, src_slf_mask)
+        # print(
+            # f"enc_output: {enc_output.shape}\nenc_src_mask: {src_mask.shape}")
 
         return enc_output
 
@@ -78,15 +98,15 @@ class Decoder(nn.Module):
         self.layer_norm = nn.LayerNorm(d_model)
         self.d_model = d_model
 
-    def forward(self, tgt_word, enc_output, tgt_mask=None, src_mask=None):
+    def forward(self, tgt_word, enc_output, tgt_slf_mask=None, tgt_src_mask=None):
         dec_output = self.layer_norm(self.dropout(self.tgt_word_emb(tgt_word)))
         # print(f"tgt_word: {tgt_word.shape}\nenc_output: {enc_output.shape}\ntgt_mask: {tgt_mask.shape}\nsrc_mask: {src_mask.shape}")
 
         for dec_layer in self.layer_stack:
             dec_output, *_ = dec_layer(dec_output,
                                        enc_output,
-                                       slf_att_mask=tgt_mask,
-                                       dec_enc_att_mask=src_mask)
+                                       dec_slf_mask=tgt_slf_mask,
+                                       dec_enc_mask=tgt_src_mask)
 
         return dec_output
 
@@ -136,19 +156,20 @@ class Transformer(nn.Module):
 
     def forward(self, src_word, tgt_word):
 
-        src_mask = get_pad_mask(src_word, src_word)
-        tgt_mask = get_pad_mask(tgt_word, tgt_word) & get_subsequent_mask(
+        src_slf_mask = get_pad_mask(src_word, src_word)
+        tgt_slf_mask = get_pad_mask(tgt_word, tgt_word) & get_subsequent_mask(
             self.len_tgt_vocab, self.len_tgt_vocab)
-        # print(f"trans_src_mask: {src_mask.shape}\ntrans_tgt_mask: {tgt_mask.shape}")
+        tgt_src_mask = get_pad_mask(tgt_word, src_word)
+        print(f"src_slf_mask: {src_slf_mask.shape}\ntgt_slf_mask: {tgt_slf_mask.shape}\ntgt_src_mask: {tgt_src_mask.shape}")
 
-        enc_output = self.encoder(src_word=src_word, src_mask=src_mask)
+        enc_output = self.encoder(src_word=src_word, src_slf_mask=src_slf_mask)
         # print(f"trans_src_word: {src_word.shape}\ntrans_src_mask: {src_mask.shape}\ntransf_enc_output: {enc_output.shape}\n")
         dec_output = self.decoder(tgt_word=tgt_word,
                                   enc_output=enc_output,
-                                  tgt_mask=tgt_mask,
-                                  src_mask=src_mask)
+                                  tgt_slf_mask=tgt_slf_mask,
+                                  tgt_src_mask=tgt_src_mask)
         print(
-            f"trans_src_word: {src_word.shape}\ntrans_src_mask: {src_mask.shape}\ntransf_enc_output: {enc_output.shape}\ntrans_dec_output: {dec_output.shape}"
+            f"trans_src_word: {src_word.shape}\nsrc_slf_mask: {src_slf_mask.shape}\ntransf_enc_output: {enc_output.shape}\ntrans_dec_output: {dec_output.shape}"
         )
         seq_pred = self.tgt_word_prj(dec_output)
         print(f"seq_pred: {seq_pred.shape}")
@@ -163,11 +184,23 @@ if __name__ == '__main__':
     BATCH_SIZE = 16
     MAX_LEN_SEQ = 100
     LEN_SRC = 100
-    LEN_TGT = 100
+    LEN_TGT = 120
     D_WORD_VEC = 512
 
     src_word = torch.rand(BATCH_SIZE, LEN_SRC).long()
+    print(f"source word: {src_word.shape}")
     tgt_word = torch.rand(BATCH_SIZE, LEN_TGT).long()
+    print(f"target word: {tgt_word.shape}")
+
+    src_word_emb = nn.Embedding(LEN_SRC, D_WORD_VEC)
+    tgt_word_emb = nn.Embedding(LEN_TGT, D_WORD_VEC)
+    # query = src_word_emb(src_word)
+    # key = src_word_emb(src_word)
+    # value = src_word_emb(src_word)
+    enc_input = src_word_emb(src_word)
+    print(f"encoder input: {enc_input.shape}")
+    dec_input = tgt_word_emb(tgt_word)
+    print(f"decoder input: {dec_input.shape}")
 
     # Hyperparameters
 
@@ -182,13 +215,20 @@ if __name__ == '__main__':
 
     # The dimensionality of qurey and key in each head
     D_K = D_MODEL // NUM_HEAD
-    # print(d_k)
 
     # The dimensionality of value in each head (could be different from d_k)
     D_V = D_K
 
     # The dimensionality of inner-layer for Position-wise Feed-Forward Network(FFN)
     D_FF = 2048
+
+    # enc_pad_mask = get_pad_mask(src_word, src_word)
+
+    # dec_enc_pad_mask = get_pad_mask(tgt_word, src_word)
+
+    # dec_pad_mask = get_pad_mask(tgt_word, tgt_word)
+    # dec_sub_mask = get_subsequent_mask(LEN_TGT, LEN_TGT)
+    # dec_slf_att_mask = dec_pad_mask & dec_sub_mask
 
     transformer = Transformer(
         len_src_vocab=LEN_SRC,
