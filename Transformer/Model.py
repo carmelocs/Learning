@@ -62,7 +62,11 @@ class Encoder(nn.Module):
 
     def forward(self, src_word, src_slf_mask=None):
         '''
-        
+        Input:
+            src_word: [B, len_src]
+            src_slf_mask: [B, len_src, len_src]
+        Output:
+            enc_output: [B, len_src, d_model]
         '''
 
         enc_output = self.layer_norm(self.dropout(self.src_word_emb(src_word)))
@@ -99,6 +103,16 @@ class Decoder(nn.Module):
         self.d_model = d_model
 
     def forward(self, tgt_word, enc_output, tgt_slf_mask=None, tgt_src_mask=None):
+        '''
+        Input:
+            tgt_word: [B, len_tgt]
+            enc_output: [B, len_src, d_model]
+            tgt_slf_mask: [B, len_tgt, len_tgt]
+            tgt_src_mask: [B, len_tgt, len_src]
+        Output:
+            dec_output: [B, len_tgt, d_model]
+        '''
+
         dec_output = self.layer_norm(self.dropout(self.tgt_word_emb(tgt_word)))
         # print(f"tgt_word: {tgt_word.shape}\nenc_output: {enc_output.shape}\ntgt_mask: {tgt_mask.shape}\nsrc_mask: {src_mask.shape}")
 
@@ -155,6 +169,13 @@ class Transformer(nn.Module):
         assert d_word_vec == d_model
 
     def forward(self, src_word, tgt_word):
+        '''
+        Input:
+            src_word: [B, len_src]
+            tgt_word: [B, len_tgt]
+        Output:
+            pred: [B, len_tgt]
+        '''
 
         src_slf_mask = get_pad_mask(src_word, src_word)
         tgt_slf_mask = get_pad_mask(tgt_word, tgt_word) & get_subsequent_mask(
