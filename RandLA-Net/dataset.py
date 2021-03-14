@@ -70,8 +70,8 @@ if __name__ == '__main__':
 
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
     for i, (point_cloud, label) in enumerate(train_dataloader):
-        if i % 10 == 9:
-            print(f'{i+1}\n{point_cloud.shape}\n{label.shape}')
+        if i % 100 == 0:
+            print(f'iteration {i}:\ndata: {point_cloud.shape}\nlabel: {label.shape}')
 
     # all_files = get_data_files('data/modelnet40_ply_hdf5_2048/train_files.txt')
     # print(all_files)
