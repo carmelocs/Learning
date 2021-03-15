@@ -264,7 +264,7 @@ class RandLANet(nn.Module):
 
         scores = self.fc_final(feat)  # [B, num_classes, N, 1]
 
-        return scores.squeeze(-1).transpose(-2, -1)
+        return scores.squeeze(-1).transpose(-2, -1).contiguous()
 
 
 if __name__ == '__main__':

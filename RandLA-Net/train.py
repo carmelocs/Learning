@@ -134,12 +134,12 @@ net.to(device)
 optimizer = optim.Adam(net.parameters(), lr=LR)
 
 for epoch in range(init_epoch, NUM_EPOCH):
-    torch.cuda.synchronize()
+    # torch.cuda.synchronize()
     start = time.time()
     train_correct = 0
     for i, (point_cloud, label) in tqdm(enumerate(train_dataloader),
                                         total=len(train_dataloader)):
-        label = label.view(-1).repeat(NUM_POINTS).long()
+        label = label.repeat(1, NUM_POINTS).view(-1).long()
         point_cloud, label = point_cloud.to(device), label.to(device)
         optimizer.zero_grad()
         net = net.train()
@@ -151,7 +151,7 @@ for epoch in range(init_epoch, NUM_EPOCH):
         pred_num = pred.argmax(dim=-1)
         train_correct += (pred_num == label).sum().item()
 
-    torch.cuda.synchronize()
+    # torch.cuda.synchronize()
     end = time.time()
     TIME += end - start
     train_acc = 100 * train_correct / (len(train_dataset) * NUM_POINTS)
@@ -165,7 +165,7 @@ for epoch in range(init_epoch, NUM_EPOCH):
     test_correct = 0
     for i, (point_cloud, label) in tqdm(enumerate(test_dataloader),
                                         total=len(test_dataloader)):
-        label = label.view(-1).long()
+        label = label.repeat(1, NUM_POINTS).view(-1).long()
         point_cloud, label = point_cloud.to(device), label.to(device)
         net = net.eval()
         pred = net(point_cloud)
